@@ -12,34 +12,55 @@
   <style>
     body { margin: 0; font-family: sans-serif; }
     #map { height: 100vh; }
+
+    /* 🎯 Thanh tìm kiếm cố định */
     #search-box {
-      position: absolute;
+      position: fixed;
       top: 10px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 9999;
-      background: white;
+      background: rgba(255,255,255,0.95);
       padding: 8px 12px;
-      border-radius: 8px;
+      border-radius: 10px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       display: flex;
       gap: 6px;
+      align-items: center;
+      backdrop-filter: blur(4px);
     }
+
+    /* 🧍‍♂️ Ngăn tự phóng to khi chạm */
     #search-input {
-      width: 180px;
-      padding: 6px;
+      width: 240px;
+      padding: 8px;
+      font-size: 16px; /* >=16px để iOS không zoom */
       border: 1px solid #aaa;
-      border-radius: 4px;
+      border-radius: 6px;
+      outline: none;
     }
+
+    #search-input:focus {
+      border-color: #0078d7;
+      box-shadow: 0 0 4px #0078d7;
+    }
+
     #search-button, #reset-button {
-      padding: 6px 10px;
+      padding: 8px 12px;
+      font-size: 16px; /* cũng >=16px để tránh zoom */
       cursor: pointer;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       background: #0078d7;
       color: white;
+      transition: 0.2s;
     }
+
     #reset-button { background: #888; }
+
+    #search-button:hover { background: #005fa3; }
+    #reset-button:hover { background: #666; }
+
     .popup { text-align:center; }
     .popup img { width:140px; border-radius:8px; margin:6px 0; object-fit:cover; }
   </style>
