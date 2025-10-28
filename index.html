@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>Bản đồ khu phố</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
+  <style>
+    #map { height: 100vh; }
+    .popup { text-align:center; }
+    .popup img { width:140px; border-radius:8px; margin:6px 0; object-fit:cover; }
+    .popup button { margin-top:4px; padding:6px 10px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div id="map">Đang tải bản đồ...</div>
+
+  <!-- Thư viện -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+
+  <script>
+    const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQqIBeupw1C1No8M1QhnC0wdPZW0Lv8LQSBfp_ahyfDVvGlWK04xWUeQlrJ-7urgTX4-9JTMmxFEpDT/pub?output=csv";
+    const fallbackImage = "https://i.postimg.cc/0ySm0FyL/no-image.png";
+
+    function fixImageLink(url) {
+      if (!url) return fallbackImage;
+      url = url.trim();
+      if (url.includes("drive.google.com")) {
+        const idMatch = url.match(/[-\w]{25,}/);
+        return idMatch ? `https://drive.google.com/uc?export=view&id=${idMatch[0]}` : fallbackImage;
+      }
+      if (url.startsWith("http")) return url;
+      if (url.startsWith("data:image")) return url;
+      return fallbackImage;
+    }
+
+    // 🌍 Bản đồ
+    const map = L.map('map').setView([10.754202, 106.482959], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 20,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    const markers = L.markerClusterGroup();
+
+    // 📊 Đọc dữ liệu CSV
+    Papa.parse(sheetURL, {
+      download: true,
+      header: false, // KHÔNG dùng header
+      skipEmptyLines: true,
+      complete: (results) => {
+        console.log("Tổng dòng đọc:", results.data.length);
+
+        results.data.slice(1).forEach((r, i) => {
+          // Dữ liệu: id, name, address, lat, lng, photo, note
+          const name = r[1] || "Chưa có tên";
+          const address = r[2] || "";
+          const lat = parseFloat(r[3]);
+          const lng = parseFloat(r[4]);
+          const photo = r[5];
+          const note = r[6] || "";
+
+          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+
+          const fixedPhoto = fixImageLink(photo);
+
+          const marker = L.marker([lat, lng]);
+          marker.bindPopup(() => `
+            <div class="popup">
+              <strong>${name}</strong><br>
+              ${address}<br>
+              <img loading="lazy" src="${fixedPhoto}" onerror="this.src='${fallbackImage}'">
+              <div style="margin-top:6px"><em>${note}</em></div>
+              <button onclick="showQR(${lat},${lng})">📍 Mã QR vị trí</button>
+            </div>
+          `);
+
+          markers.addLayer(marker);
+        });
+
+        map.addLayer(markers);
+      },
+      error: (err) => alert("Không tải được dữ liệu: " + err)
+    });
+
+    // 📱 QR code
+    function showQR(lat, lng) {
+      const url = `https://www.google.com/maps?q=${lat},${lng}`;
+      const qr = new QRious({ value: url, size: 200 });
+      const w = window.open("", "_blank", "width=300,height=350");
+      w.document.write(`<h3>Mã QR vị trí</h3><img src="${qr.toDataURL()}"><br><a href="${url}" target="_blank">Mở Google Maps</a>`);
+    }
+  </script>
+</body>
+</html>
