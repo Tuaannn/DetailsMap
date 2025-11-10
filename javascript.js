@@ -21,7 +21,7 @@
         document.getElementById("search-box").style.display = "flex";
         initMap();
       } else {
-        error.textContent = "❌ Sai tài khoản hoặc mật khẩu!";
+        error.textContent = "❌ Sai tài khoản hoặc mật khẩu!, Vui lòng liên hệ quản trị viên";
       }
     }
 
