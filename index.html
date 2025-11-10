@@ -2,185 +2,44 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <title>Bản đồ khu phố</title>
+  <title>Bản đồ khu phố (Đăng nhập bảo mật)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
 
+  <!-- Thư viện Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <link rel="stylesheet" href="./style.css">
 
-  <style>
-    body { margin: 0; font-family: sans-serif; }
-    #map { height: 100vh; }
 
-    /* 🎯 Thanh tìm kiếm cố định */
-    #search-box {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 9999;
-      background: rgba(255,255,255,0.95);
-      padding: 8px 12px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      backdrop-filter: blur(4px);
-    }
-
-    /* 🧍‍♂️ Ngăn tự phóng to khi chạm */
-    #search-input {
-      width: 240px;
-      padding: 8px;
-      font-size: 16px; /* >=16px để iOS không zoom */
-      border: 1px solid #aaa;
-      border-radius: 6px;
-      outline: none;
-    }
-
-    #search-input:focus {
-      border-color: #0078d7;
-      box-shadow: 0 0 4px #0078d7;
-    }
-
-    #search-button, #reset-button {
-      padding: 8px 12px;
-      font-size: 16px; /* cũng >=16px để tránh zoom */
-      cursor: pointer;
-      border: none;
-      border-radius: 6px;
-      background: #0078d7;
-      color: white;
-      transition: 0.2s;
-    }
-
-    #reset-button { background: #888; }
-
-    #search-button:hover { background: #005fa3; }
-    #reset-button:hover { background: #666; }
-
-    .popup { text-align:center; }
-    .popup img { width:140px; border-radius:8px; margin:6px 0; object-fit:cover; }
-  </style>
 </head>
 <body>
+
+  <!-- 🔐 FORM ĐĂNG NHẬP -->
+  <div id="login-container">
+    <div id="login-box">
+      <h2>Đăng nhập</h2>
+      <input type="text" id="username" placeholder="Tài khoản"><br>
+      <input type="password" id="password" placeholder="Mật khẩu"><br>
+      <button onclick="checkLogin()">Đăng nhập</button>
+      <div id="error-msg"></div>
+    </div>
+  </div>
+
+  <!-- 🌍 KHU VỰC MAP -->
   <div id="search-box">
     <input type="text" id="search-input" placeholder="🔍 Tìm theo tên hoặc địa chỉ...">
     <button id="search-button">Tìm</button>
     <button id="reset-button">Xóa</button>
   </div>
-  <div id="map">Đang tải bản đồ...</div>
+  <div id="map"></div>
 
-  <!-- Thư viện -->
+  <!-- Thư viện JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-
-  <script>
-    const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQX9rOqG7YSLYfxWQeeAAf9mOqyF9nnz0vrxCeovj5DniO4NdfrH_NMJKASCjnL23a8bb-_O3yP33Bg/pub?output=csv";
-    const fallbackImage = "https://i.postimg.cc/0ySm0FyL/no-image.png";
-
-    function fixImageLink(url) {
-      if (!url) return fallbackImage;
-      url = url.trim();
-      if (url.includes("drive.google.com")) {
-        const idMatch = url.match(/[-\w]{25,}/);
-        return idMatch ? `https://drive.google.com/uc?export=view&id=${idMatch[0]}` : fallbackImage;
-      }
-      if (url.startsWith("http")) return url;
-      if (url.startsWith("data:image")) return url;
-      return fallbackImage;
-    }
-
-    // 🌍 Bản đồ
-    const map = L.map('map').setView([10.754202, 106.482959], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 20,
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    const markers = L.markerClusterGroup();
-    const allMarkers = []; // Lưu toàn bộ marker để tìm kiếm
-
-    // 📊 Đọc dữ liệu CSV
-    Papa.parse(sheetURL, {
-      download: true,
-      header: false,
-      skipEmptyLines: true,
-      complete: (results) => {
-        results.data.slice(1).forEach((r) => {
-          const name = r[1] || "Chưa có tên";
-          const address = r[2] || "";
-          const lat = parseFloat(r[3]);
-          const lng = parseFloat(r[4]);
-          const photo = r[5];
-          const note = r[6] || "";
-          if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
-
-          const fixedPhoto = fixImageLink(photo);
-
-          const marker = L.marker([lat, lng]);
-          marker.bindPopup(`
-            <div class="popup">
-              <strong>${name}</strong><br>
-              ${address}<br>
-              <img loading="lazy" src="${fixedPhoto}" onerror="this.src='${fallbackImage}'">
-              <div style="margin-top:6px"><em>${note}</em></div>
-              <button onclick="showQR(${lat},${lng})">📍 Mã QR vị trí</button>
-            </div>
-          `);
-          marker.name = name.toLowerCase();
-          marker.address = address.toLowerCase();
-
-          allMarkers.push(marker);
-          markers.addLayer(marker);
-        });
-
-        map.addLayer(markers);
-      },
-      error: (err) => alert("Không tải được dữ liệu: " + err)
-    });
-
-    // 🔍 Tìm kiếm
-    const searchInput = document.getElementById("search-input");
-    const searchBtn = document.getElementById("search-button");
-    const resetBtn = document.getElementById("reset-button");
-
-    searchBtn.addEventListener("click", searchPlaces);
-    searchInput.addEventListener("keyup", (e) => { if (e.key === "Enter") searchPlaces(); });
-    resetBtn.addEventListener("click", resetSearch);
-
-    function searchPlaces() {
-      const keyword = searchInput.value.trim().toLowerCase();
-      if (!keyword) return;
-
-      markers.clearLayers();
-      const found = allMarkers.filter(m => m.name.includes(keyword) || m.address.includes(keyword));
-      if (found.length === 0) {
-        alert("Không tìm thấy kết quả phù hợp.");
-      } else {
-        found.forEach(m => markers.addLayer(m));
-        map.fitBounds(L.featureGroup(found).getBounds());
-      }
-    }
-
-    function resetSearch() {
-      searchInput.value = "";
-      markers.clearLayers();
-      allMarkers.forEach(m => markers.addLayer(m));
-      map.setView([10.754202, 106.482959], 13);
-    }
-
-    // 📱 QR code
-    function showQR(lat, lng) {
-      const url = `https://www.google.com/maps?q=${lat},${lng}`;
-      const qr = new QRious({ value: url, size: 200 });
-      const w = window.open("", "_blank", "width=300,height=350");
-      w.document.write(`<h3>Mã QR vị trí</h3><img src="${qr.toDataURL()}"><br><a href="${url}" target="_blank">Mở Google Maps</a>`);
-    }
-  </script>
+  <script src="./javascript.js"></script>
+ 
 </body>
 </html>
